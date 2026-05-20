@@ -5,3 +5,5 @@ out
 .env*.local
 *.log
 CLAUDE.md
+cluade.md
+task.txt

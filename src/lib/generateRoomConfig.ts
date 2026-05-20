@@ -43,6 +43,8 @@ export interface RoomSection {
   priority: number;
   /** Position in 3D world: [x, y, z]. */
   position: [number, number, number];
+  /** Rotation around Y axis in radians. */
+  rotationY?: number;
   /** Camera target when guided tour visits this section. */
   cameraStop: { position: [number, number, number]; lookAt: [number, number, number] };
   data?: unknown;
@@ -219,36 +221,83 @@ export function generateRoomConfig(resume: ResumeData): RoomConfig {
     if (s) s.priority = -10 + idx; // Pull these to the front.
   });
 
-  const enabled = candidates
-    .filter((c) => c.enabled)
-    .sort((a, b) => a.priority - b.priority);
+  const enabled = candidates.filter((c) => c.enabled);
 
-  // Place sections on a ring around origin. Profile sits behind the camera.
-  const radius = 9;
-  const sections: RoomSection[] = enabled.map((sec, idx) => {
-    if (sec.id === "profile") {
-      return {
-        ...sec,
-        position: [0, 1.5, -6.5],
-        cameraStop: { position: [0, 1.6, 0], lookAt: [0, 1.5, -6.5] },
-      };
+  const TECH_ZONE_IDS = [
+    "ai-lab",
+    "frontend-studio",
+    "backend-server",
+    "database",
+    "devops-cloud",
+    "cybersecurity",
+    "mobile",
+    "dataviz",
+  ];
+
+  const enabledTechZones = enabled.filter((sec) => TECH_ZONE_IDS.includes(sec.id));
+  const numTechZones = enabledTechZones.length;
+
+  const radius = 8.5;
+
+  const sectionsWithAngles = enabled.map((sec) => {
+    let angle = 0;
+    if (sec.id === "profile") angle = 0;
+    else if (sec.id === "skills") angle = 45;
+    else if (sec.id === "projects") angle = 90;
+    else if (sec.id === "experience") angle = 135;
+    else if (sec.id === "education") angle = 180;
+    else if (sec.id === "achievements") angle = 225;
+    else if (sec.id === "certifications") angle = 245;
+    else if (sec.id === "contact") angle = 315;
+    else if (TECH_ZONE_IDS.includes(sec.id)) {
+      if (numTechZones <= 1) {
+        angle = 270;
+      } else {
+        const idx = enabledTechZones.findIndex((t) => t.id === sec.id);
+        const span = Math.min(45, (numTechZones - 1) * 12);
+        const start = 270 - span / 2;
+        const step = numTechZones > 1 ? span / (numTechZones - 1) : 0;
+        angle = start + idx * step;
+      }
     }
-    // Distribute remaining sections across roughly 270° in front of the user.
-    const others = enabled.filter((e) => e.id !== "profile");
-    const ringIdx = others.findIndex((e) => e.id === sec.id);
-    const total = others.length;
-    const startAngle = -Math.PI * 0.85;
-    const endAngle = Math.PI * 0.85;
-    const t = total <= 1 ? 0.5 : ringIdx / (total - 1);
-    const angle = startAngle + (endAngle - startAngle) * t;
-    const x = Math.sin(angle) * radius;
-    const z = Math.cos(angle) * radius * -1; // negative so they sit in front
-    const position: [number, number, number] = [x, 1.4, z];
-    const cam: [number, number, number] = [x * 0.4, 1.6, z * 0.4 + 1.5];
+
+    return { sec, angle };
+  });
+
+  // Sort sections by angle clockwise (0 -> 315) so the scroll sequence follows the circle!
+  sectionsWithAngles.sort((a, b) => a.angle - b.angle);
+
+  const sections: RoomSection[] = sectionsWithAngles.map(({ sec, angle }) => {
+    const angleRad = (angle * Math.PI) / 180;
+    const x = Math.sin(angleRad) * radius;
+    const z = -Math.cos(angleRad) * radius;
+
+    // Camera look-at is the section center
+    const lookAt: [number, number, number] = [x, 1.4, z];
+
+    // Camera stop is placed closer to the center, looking outward
+    let viewDistance = 4.2;
+    if (sec.id === "profile" || sec.id === "contact") {
+      viewDistance = 4.8;
+    } else if (sec.id === "projects" || sec.id === "experience" || sec.id === "frontend-studio") {
+      viewDistance = 4.4;
+    } else if (TECH_ZONE_IDS.includes(sec.id)) {
+      viewDistance = 3.6; // closer look for specialized pods
+    }
+
+    const camRadius = radius - viewDistance;
+    const camX = Math.sin(angleRad) * camRadius;
+    const camZ = -Math.cos(angleRad) * camRadius;
+    const camY = 1.62;
+
     return {
       ...sec,
-      position,
-      cameraStop: { position: cam, lookAt: position },
+      position: [x, 1.4, z],
+      rotationY: angleRad,
+      cameraStop: {
+        position: [camX, camY, camZ],
+        lookAt,
+      },
     };
   });
 
