@@ -90,14 +90,18 @@ export default function ScrollTimeline() {
       easedT
     );
 
-    // Subtle floating parallax movement based on time
+    // Subtle floating parallax movement based on time + interactive mouse pointer sway
     const time = state.clock.getElapsedTime();
     const driftX = Math.sin(time * 0.35) * 0.12;
     const driftY = Math.cos(time * 0.3) * 0.08;
     const driftZ = Math.sin(time * 0.2) * 0.05;
 
-    targetPos.x += driftX;
-    targetPos.y += driftY;
+    // Pointer-based parallax sway (normalized between -1 and 1)
+    const swayX = state.pointer.x * 0.25;
+    const swayY = state.pointer.y * 0.18;
+
+    targetPos.x += driftX + swayX;
+    targetPos.y += driftY + swayY;
     targetPos.z += driftZ;
 
     // Smoothly interpolate the camera's actual position

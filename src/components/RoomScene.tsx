@@ -116,6 +116,30 @@ export default function RoomScene() {
         </mesh>
       </group>
 
+      {/* Ceiling structure */}
+      {!performanceMode && (
+        <group position={[0, 4.2, 0]}>
+          {/* Central ceiling ring hub */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[1.5, 0.08, 8, 64]} />
+            <meshStandardMaterial color="#0c0e25" metalness={0.9} roughness={0.2} />
+          </mesh>
+          
+          {/* Radial ceiling beams */}
+          {[0, 45, 90, 135, 180, 225, 245, 270, 315].map((angle) => {
+            const angleRad = (angle * Math.PI) / 180;
+            return (
+              <group key={angle} rotation={[0, angleRad, 0]}>
+                <mesh position={[0, 0, -4.5]} castShadow>
+                  <boxGeometry args={[0.12, 0.06, 7.0]} />
+                  <meshStandardMaterial color="#0f1330" metalness={0.8} roughness={0.3} />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      )}
+
       {trailCurve && (
         <mesh>
           <tubeGeometry args={[trailCurve, 120, 0.015, 8, false]} />
@@ -231,6 +255,34 @@ export default function RoomScene() {
               color={spotColor}
               castShadow={!performanceMode}
             />
+
+            {/* Structural vertical column & support ribs behind section */}
+            <group position={[0, 0.7, -1.45]}>
+              {/* Heavy metallic structural pillar */}
+              <mesh castShadow receiveShadow>
+                <boxGeometry args={[0.24, 4.2, 0.24]} />
+                <meshStandardMaterial color="#0c0f24" metalness={0.9} roughness={0.25} />
+              </mesh>
+              {/* Pillar trim rings */}
+              <mesh position={[0, 1.4, 0]}>
+                <cylinderGeometry args={[0.15, 0.15, 0.05, 16]} />
+                <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} />
+              </mesh>
+              <mesh position={[0, -1.4, 0]}>
+                <cylinderGeometry args={[0.15, 0.15, 0.05, 16]} />
+                <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} />
+              </mesh>
+              {/* Left support rib */}
+              <mesh position={[-0.8, 0, 0.05]} rotation={[0, 0, -Math.PI / 6]}>
+                <boxGeometry args={[0.06, 0.8, 0.12]} />
+                <meshStandardMaterial color="#1a1e3a" metalness={0.7} roughness={0.4} />
+              </mesh>
+              {/* Right support rib */}
+              <mesh position={[0.8, 0, 0.05]} rotation={[0, 0, Math.PI / 6]}>
+                <boxGeometry args={[0.06, 0.8, 0.12]} />
+                <meshStandardMaterial color="#1a1e3a" metalness={0.7} roughness={0.4} />
+              </mesh>
+            </group>
 
             {/* Backboard/wall panel behind section */}
             <group position={[0, 0.9, -1.3]}>
