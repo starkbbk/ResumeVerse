@@ -5,6 +5,13 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useAppStore } from "@/lib/store";
+import {
+  CAMERA_MIN_Y,
+  CAMERA_PREFERRED_MAX_Y,
+  TARGET_MIN_Y,
+  TARGET_MAX_Y,
+  OVERVIEW_STOP,
+} from "@/lib/cameraStops";
 
 export default function ScrollTimeline() {
   const scroll = useScroll();
@@ -16,7 +23,6 @@ export default function ScrollTimeline() {
   const scenes = useMemo(() => {
     if (!room) return [];
 
-    // Start with a majestic intro wide shot.
     const list: Array<{
       id: import("@/lib/generateRoomConfig").SectionId | "intro";
       title: string;
@@ -26,12 +32,11 @@ export default function ScrollTimeline() {
       {
         id: "intro",
         title: "Overview",
-        cameraPosition: new THREE.Vector3(0, 6.2, 13.5),
-        cameraTarget: new THREE.Vector3(0, 1.4, 0),
+        cameraPosition: new THREE.Vector3(...OVERVIEW_STOP.position),
+        cameraTarget: new THREE.Vector3(...OVERVIEW_STOP.lookAt),
       },
     ];
 
-    // Add each active/enabled section's camera coordinates.
     room.sections.forEach((sec) => {
       list.push({
         id: sec.id,
@@ -45,26 +50,33 @@ export default function ScrollTimeline() {
   }, [room]);
 
   const lastActiveRef = useRef<string | null>(null);
+  const isMobileRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => {
+      isMobileRef.current = mq.matches;
+    };
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useFrame((state, delta) => {
     if (scenes.length < 2) return;
 
-    // scroll.offset is updated by Drei ScrollControls (from 0 to 1)
     const offset = scroll.offset;
-
-    // Segment size for each transition
     const N = scenes.length;
     const rawIdx = Math.max(0, Math.min(offset * (N - 1), N - 1));
     const activeIdx = Math.min(Math.round(rawIdx), N - 1);
 
-    // Sync current section state
     const activeScene = scenes[activeIdx];
     if (activeScene && activeScene.id !== lastActiveRef.current) {
       lastActiveRef.current = activeScene.id;
       setActiveSection(activeScene.id);
     }
 
-    // Interpolation between lower and upper scenes
     const lowerIdx = Math.floor(rawIdx);
     const upperIdx = Math.min(lowerIdx + 1, N - 1);
 
@@ -72,59 +84,68 @@ export default function ScrollTimeline() {
     const upperScene = scenes[upperIdx];
 
     const t = lowerIdx === upperIdx ? 0 : rawIdx - lowerIdx;
-
-    // easeInOutCubic easing
+    // easeInOutCubic
     const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-    // Camera position interpolation
     const targetPos = new THREE.Vector3().lerpVectors(
       lowerScene.cameraPosition,
       upperScene.cameraPosition,
-      easedT
+      easedT,
     );
-
-    // Camera target (look-at) interpolation
     const targetLookAt = new THREE.Vector3().lerpVectors(
       lowerScene.cameraTarget,
       upperScene.cameraTarget,
-      easedT
+      easedT,
     );
 
-    // Subtle floating parallax movement based on time + interactive mouse pointer sway
+    // Subtle floating parallax + pointer sway. Keep these small so they never
+    // push the camera below the safe minimum height.
     const time = state.clock.getElapsedTime();
-    const driftX = Math.sin(time * 0.35) * 0.12;
-    const driftY = Math.cos(time * 0.3) * 0.08;
-    const driftZ = Math.sin(time * 0.2) * 0.05;
-
-    // Pointer-based parallax sway (normalized between -1 and 1)
-    const swayX = state.pointer.x * 0.25;
-    const swayY = state.pointer.y * 0.18;
+    const driftX = Math.sin(time * 0.35) * 0.08;
+    const driftY = Math.cos(time * 0.3) * 0.05;
+    const driftZ = Math.sin(time * 0.2) * 0.04;
+    const swayX = state.pointer.x * 0.18;
+    const swayY = state.pointer.y * 0.1;
 
     targetPos.x += driftX + swayX;
     targetPos.y += driftY + swayY;
     targetPos.z += driftZ;
 
-    // Smoothly interpolate the camera's actual position
+    // Hard safety clamp — camera should never sneak below human eye level
+    // or shoot up above the ceiling lights, no matter what drift is applied.
+    targetPos.y = Math.max(CAMERA_MIN_Y, Math.min(targetPos.y, CAMERA_PREFERRED_MAX_Y + 0.4));
+    targetLookAt.y = Math.max(TARGET_MIN_Y, Math.min(targetLookAt.y, TARGET_MAX_Y));
+
+    // Mobile: bottom sheet covers ~42vh, so raise the look-at and lift the
+    // camera a touch to keep the active object in the visible area.
+    if (isMobileRef.current && activeIdx > 0) {
+      targetPos.y = Math.min(targetPos.y + 0.4, CAMERA_PREFERRED_MAX_Y + 0.4);
+      targetLookAt.y = Math.min(targetLookAt.y + 0.35, TARGET_MAX_Y);
+    }
+
     camera.position.lerp(targetPos, Math.min(1, delta * 7.5));
 
-    // Smoothly interpolate the look-at target direction
     const currentDir = new THREE.Vector3();
     camera.getWorldDirection(currentDir);
 
-    const targetDir = new THREE.Vector3().subVectors(targetLookAt, camera.position).normalize();
+    const targetDir = new THREE.Vector3()
+      .subVectors(targetLookAt, camera.position)
+      .normalize();
     const blendedDir = currentDir.lerp(targetDir, Math.min(1, delta * 7.5)).normalize();
     const lookAtPos = new THREE.Vector3().addVectors(camera.position, blendedDir);
 
     camera.lookAt(lookAtPos);
 
-    // Subtle cinematic camera roll (up-vector drift)
-    const upVector = new THREE.Vector3(driftX * 0.03, 1, 0).normalize();
+    // Subtle cinematic camera roll — kept tiny so the horizon never tilts oddly.
+    const upVector = new THREE.Vector3(driftX * 0.02, 1, 0).normalize();
     camera.up.copy(upVector);
   });
 
-  // Bind a helper window method for vertical navigation dots to trigger smooth scroll
+  // Bind a helper for vertical navigation dots / programmatic jumps.
   useEffect(() => {
-    (window as any).__scrollToSection = (index: number) => {
+    (window as unknown as { __scrollToSection?: (i: number) => void }).__scrollToSection = (
+      index: number,
+    ) => {
       if (scroll && scroll.el) {
         const N = scenes.length;
         const targetScroll =
@@ -134,7 +155,7 @@ export default function ScrollTimeline() {
     };
 
     return () => {
-      delete (window as any).__scrollToSection;
+      delete (window as unknown as { __scrollToSection?: (i: number) => void }).__scrollToSection;
     };
   }, [scroll, scenes]);
 

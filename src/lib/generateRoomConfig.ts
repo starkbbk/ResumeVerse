@@ -17,6 +17,7 @@ import {
   ruleHasSkills,
 } from "./roomRules";
 import type { ResumeData } from "./resumeSchema";
+import { createCameraStop, STOP_PRESETS } from "./cameraStops";
 
 export type SectionId =
   | "profile"
@@ -272,32 +273,33 @@ export function generateRoomConfig(resume: ResumeData): RoomConfig {
     const x = Math.sin(angleRad) * radius;
     const z = -Math.cos(angleRad) * radius;
 
-    // Camera look-at is the section center
-    const lookAt: [number, number, number] = [x, 1.4, z];
+    // Sections are anchored on the floor (y = 0). Each individual section
+    // component handles its own internal vertical layout (desk top, screens,
+    // hero objects) starting from y = 0. Earlier we floated sections at
+    // y = 1.4 which made the camera look up at the underside of every desk.
+    const sectionPosition: [number, number, number] = [x, 0, z];
 
-    // Camera stop is placed closer to the center, looking outward
-    let viewDistance = 4.2;
-    if (sec.id === "profile" || sec.id === "contact") {
-      viewDistance = 4.8;
-    } else if (sec.id === "projects" || sec.id === "experience" || sec.id === "frontend-studio") {
-      viewDistance = 4.4;
-    } else if (TECH_ZONE_IDS.includes(sec.id)) {
-      viewDistance = 3.6; // closer look for specialized pods
-    }
-
-    const camRadius = radius - viewDistance;
-    const camX = Math.sin(angleRad) * camRadius;
-    const camZ = -Math.cos(angleRad) * camRadius;
-    const camY = 1.62;
+    // Per-section camera preset, with a sensible fallback.
+    const preset = STOP_PRESETS[sec.id] ?? {
+      distance: 5.0,
+      height: 3.1,
+      targetHeight: 1.9,
+    };
+    const stop = createCameraStop(
+      sectionPosition,
+      preset.distance,
+      preset.height,
+      preset.targetHeight,
+    );
 
     return {
       ...sec,
-      position: [x, 1.4, z],
-      rotationY: angleRad,
-      cameraStop: {
-        position: [camX, camY, camZ],
-        lookAt,
-      },
+      position: sectionPosition,
+      // Rotate section so its local +Z (front face) points back toward the
+      // origin / camera. The camera sits between the origin and the section
+      // on the same radial line, so we negate the angle here.
+      rotationY: -angleRad,
+      cameraStop: stop,
     };
   });
 

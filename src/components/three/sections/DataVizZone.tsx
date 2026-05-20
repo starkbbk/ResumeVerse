@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useContext, useRef } from "react";
+import { useContext, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import InteractiveGroup, { SectionContext } from "../InteractiveGroup";
 import SectionLabel from "../SectionLabel";
+import DetailedDesk from "../objects/DetailedDesk";
+import DetailedMonitor from "../objects/DetailedMonitor";
+import Model from "@/components/3d/Model";
 
 interface Props {
   position: [number, number, number];
@@ -13,142 +16,116 @@ interface Props {
 }
 
 export default function DataVizZone({ position, accent }: Props) {
-  const context = useContext(SectionContext);
-  const isActive = context ? context.isActive : true;
+  const ctx = useContext(SectionContext);
+  const isActive = ctx ? ctx.isActive : true;
 
-  const chartGroupRef = useRef<THREE.Group>(null);
-
-  // Pre-calculated heights for glass bar charts
-  const barHeights = useMemo(() => [0.35, 0.55, 0.75, 0.5, 0.9, 0.65], []);
-
-  // Pre-calculated coordinates for zigzagging neon line graph
-  const lineNodes = useMemo(() => [
-    { pos: new THREE.Vector3(-0.85, 0.25, 0.25), color: "#22d3ee" },
-    { pos: new THREE.Vector3(-0.55, 0.6, 0.15), color: "#22d3ee" },
-    { pos: new THREE.Vector3(-0.25, 0.45, 0.05), color: "#22d3ee" },
-    { pos: new THREE.Vector3(0.05, 0.85, -0.05), color: "#ec4899" },
-    { pos: new THREE.Vector3(0.35, 0.7, -0.15), color: "#ec4899" },
-    { pos: new THREE.Vector3(0.65, 1.15, -0.25), color: "#ec4899" },
-  ], []);
+  const barRefs = useRef<THREE.Mesh[]>([]);
+  const baseHeights = useMemo(() => [0.35, 0.55, 0.78, 0.5, 0.92, 0.65], []);
 
   useFrame((state) => {
-    const time = state.clock.elapsedTime;
-
-    // Pulse the bar cores emissive intensity
-    if (chartGroupRef.current && isActive) {
-      chartGroupRef.current.children.forEach((bar, idx) => {
-        // Find internal core cylinder
-        if (bar.children.length > 1) {
-          const coreMat = (bar.children[1] as THREE.Mesh).material as THREE.MeshBasicMaterial;
-          if (coreMat) {
-            coreMat.opacity = 0.4 + Math.sin(time * 5.0 + idx) * 0.4;
-          }
-        }
-      });
-    }
+    const t = state.clock.elapsedTime;
+    barRefs.current.forEach((m, i) => {
+      if (!m) return;
+      const target = baseHeights[i] + (isActive ? Math.sin(t * 1.5 + i) * 0.08 : 0);
+      m.scale.y = THREE.MathUtils.lerp(m.scale.y, target / baseHeights[i], 0.12);
+    });
   });
+
+  const screen = (
+    <div className="w-full h-full p-2 text-white">
+      <div className="flex items-center justify-between border-b border-cyan-400/30 pb-1 mb-1">
+        <span className="font-mono text-[7px] tracking-widest font-bold text-cyan-200">
+          ANALYTICS
+        </span>
+        <span className="font-mono text-[6px] text-emerald-300">LIVE · 12k/s</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <div className="rounded bg-cyan-500/12 border border-cyan-400/30 p-1">
+          <div className="text-[5px] uppercase opacity-70">CONVERSION</div>
+          <div className="text-[10px] font-bold text-cyan-200">+48.5%</div>
+        </div>
+        <div className="rounded bg-emerald-500/12 border border-emerald-400/30 p-1">
+          <div className="text-[5px] uppercase opacity-70">REVENUE</div>
+          <div className="text-[10px] font-bold text-emerald-200">$2.4M</div>
+        </div>
+        <div className="col-span-2 rounded bg-purple-500/12 border border-purple-400/30 p-1">
+          <div className="text-[5px] uppercase opacity-70 mb-0.5">TRAFFIC</div>
+          <div className="h-3 flex items-end gap-0.5">
+            {[3, 5, 4, 6, 5, 7, 8, 6, 9, 7, 8, 10].map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t bg-purple-400/60"
+                style={{ height: `${h * 8}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <InteractiveGroup id="dataviz" position={position}>
-      {/* 1. Base Circular Podium */}
-      <mesh receiveShadow position={[0, 0.05, 0]}>
-        <cylinderGeometry args={[1.1, 1.2, 0.08, 24]} />
-        <meshStandardMaterial color="#0c0f1f" metalness={0.7} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.09, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.08, 0.012, 8, 64]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.0} />
-      </mesh>
+      <Model src="/models/desk.glb" fallback={<DetailedDesk width={2.6} depth={1.2} accent={accent} />} />
 
-      {/* 2. Glass Bar Charts with Glowing Cores */}
-      <group ref={chartGroupRef} position={[0, 0.08, 0]}>
-        {barHeights.map((h, i) => {
-          const x = -0.75 + i * 0.28;
-          const z = 0.15 - i * 0.05;
+      {/* 3D bar chart on top of the desk */}
+      <group position={[0, 0.89, 0.05]}>
+        {baseHeights.map((h, i) => {
+          const x = -0.6 + i * 0.24;
           return (
-            <group key={i} position={[x, h / 2, z]}>
-              {/* Translucent Glass Outer Sleeve */}
-              <mesh castShadow>
+            <group key={i} position={[x, h / 2, 0]}>
+              {/* glass outer */}
+              <mesh
+                ref={(el) => {
+                  if (el) barRefs.current[i] = el;
+                }}
+                castShadow
+              >
                 <boxGeometry args={[0.16, h, 0.16]} />
                 <meshStandardMaterial
-                  color="#1e293b"
-                  roughness={0.05}
-                  metalness={0.9}
+                  color="#1a1f33"
+                  metalness={0.85}
+                  roughness={0.1}
                   transparent
-                  opacity={0.5}
+                  opacity={0.55}
                 />
               </mesh>
-              {/* Glowing Inner Core */}
-              <mesh position={[0, 0, 0]}>
-                <boxGeometry args={[0.08, h * 0.9, 0.08]} />
-                <meshBasicMaterial color={accent} transparent opacity={0.6} />
+              {/* glowing core */}
+              <mesh>
+                <boxGeometry args={[0.085, h * 0.94, 0.085]} />
+                <meshStandardMaterial
+                  color={accent}
+                  emissive={accent}
+                  emissiveIntensity={isActive ? 1.4 : 0.5}
+                />
               </mesh>
+              {/* metric label */}
+              <Html
+                transform
+                position={[0, h / 2 + 0.05, 0]}
+                distanceFactor={3}
+                style={{ pointerEvents: "none" }}
+              >
+                <span className="text-[6px] font-mono font-bold text-cyan-200 bg-black/55 px-1 rounded whitespace-nowrap">
+                  {(h * 100).toFixed(0)}%
+                </span>
+              </Html>
             </group>
           );
         })}
       </group>
 
-      {/* 3. Zigzagging Neon Line Graph */}
-      <group position={[0, 0.08, 0]}>
-        {/* Render node spheres */}
-        {lineNodes.map((node, i) => (
-          <mesh key={i} position={node.pos.toArray() as [number, number, number]}>
-            <sphereGeometry args={[0.035, 12, 12]} />
-            <meshBasicMaterial color={node.color} />
-          </mesh>
-        ))}
-
-        {/* Connect nodes with thin cylinders to build the line segments */}
-        {Array.from({ length: lineNodes.length - 1 }).map((_, i) => {
-          const start = lineNodes[i].pos;
-          const end = lineNodes[i + 1].pos;
-          const dist = start.distanceTo(end);
-          const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-
-          // Calculate cylinder rotation to align with start-to-end vector
-          const direction = new THREE.Vector3().subVectors(end, start).normalize();
-          const alignVector = new THREE.Vector3(0, 1, 0);
-          const quaternion = new THREE.Quaternion().setFromUnitVectors(alignVector, direction);
-
-          return (
-            <mesh
-              key={i}
-              position={midPoint.toArray() as [number, number, number]}
-              quaternion={quaternion}
-            >
-              <cylinderGeometry args={[0.008, 0.008, dist, 6]} />
-              <meshBasicMaterial color={lineNodes[i].color} transparent opacity={0.8} />
-            </mesh>
-          );
-        })}
+      {/* Analytics dashboard monitor on the desk, behind the bars */}
+      <group position={[0, 0.89, -0.4]}>
+        <DetailedMonitor
+          width={0.95}
+          accent={accent}
+          highlighted={isActive}
+          screen={screen}
+        />
       </group>
 
-      {/* 4. Holographic Analytical Dashboard Screen */}
-      <group position={[0, 0.4, -0.3]}>
-        <mesh position={[0, 0.22, 0]} castShadow>
-          <boxGeometry args={[0.04, 0.44, 0.04]} />
-          <meshStandardMaterial color="#1a1e3a" />
-        </mesh>
-        <mesh position={[0, 0.44, 0]} castShadow>
-          <boxGeometry args={[0.66, 0.42, 0.03]} />
-          <meshStandardMaterial color="#1a202c" metalness={0.9} />
-        </mesh>
-        <mesh position={[0, 0.44, 0.016]}>
-          <boxGeometry args={[0.62, 0.38, 0.005]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.2} />
-        </mesh>
-        <Html transform position={[0, 0.44, 0.02]} distanceFactor={1.35} style={{ pointerEvents: "none" }}>
-          <div className="w-[125px] p-2 font-sans text-[5.5px] text-cyan-300 leading-normal select-none">
-            <div className="font-mono font-bold border-b border-cyan-500/20 pb-0.5 mb-1 text-white">ANALYTICS SYSTEM //</div>
-            <div>SHIELD CONVERSION: +48.5%</div>
-            <div>ACTIVE QUERIES: 342/s</div>
-            <div className="text-emerald-400 font-bold">REVENUE PROGRESS: OK</div>
-            <div className="text-slate-400">DATA SOURCE: SPARK / LOOKER</div>
-          </div>
-        </Html>
-      </group>
-
-      <SectionLabel title="DATA VISUALIZATION" accent={accent} position={[0, 2.0, 0]} />
+      <SectionLabel title="DATA VISUALIZATION" accent={accent} position={[0, 3.1, 0]} />
     </InteractiveGroup>
   );
 }

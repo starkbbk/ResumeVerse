@@ -1,10 +1,13 @@
 "use client";
 
-import { useContext } from "react";
-import { Html } from "@react-three/drei";
-import * as THREE from "three";
-import InteractiveGroup, { SectionContext } from "../InteractiveGroup";
+import InteractiveGroup from "../InteractiveGroup";
 import SectionLabel from "../SectionLabel";
+import DetailedDesk from "../objects/DetailedDesk";
+import DetailedDiplomaFrame from "../objects/DetailedDiplomaFrame";
+import DetailedBookStack from "../objects/DetailedBookStack";
+import DetailedGraduationCap from "../objects/DetailedGraduationCap";
+import Model from "@/components/3d/Model";
+import { Html } from "@react-three/drei";
 import type { ResumeEducation } from "@/lib/resumeSchema";
 
 interface Props {
@@ -13,169 +16,78 @@ interface Props {
   accent: string;
 }
 
+/**
+ * Academic museum display: thick desk with framed diploma standing tall in
+ * the center, leather book stack with mortarboard on top to one side, and
+ * a brass plaque listing additional degrees on the other.
+ */
 export default function EducationWall({ position, education, accent }: Props) {
-  const context = useContext(SectionContext);
-  const isActive = context ? context.isActive : true;
-
-  // Primary education item (usually degree) and secondary items
-  const primaryEd = education[0];
-  const secondaryEd = education.slice(1);
+  const primary = education[0];
+  const secondary = education.slice(1);
 
   return (
     <InteractiveGroup id="education" position={position} bobble={false}>
-      {/* 1. Wood Museum Podium Base */}
-      <mesh castShadow receiveShadow position={[0, 0.2, 0]}>
-        <boxGeometry args={[2.2, 0.4, 1.1]} />
-        <meshStandardMaterial color="#0c0f24" roughness={0.4} metalness={0.6} />
-      </mesh>
-      {/* Golden metallic rim */}
-      <mesh position={[0, 0.41, 0]}>
-        <boxGeometry args={[2.16, 0.02, 1.06]} />
-        <meshStandardMaterial color="#d4af37" metalness={0.9} roughness={0.1} />
-      </mesh>
+      {/* Display desk */}
+      <Model src="/models/desk.glb" fallback={<DetailedDesk width={2.8} depth={1.2} accent={accent} />} />
 
-      {/* 2. Spotlit Framed Diploma / Certificate */}
-      {primaryEd && (
-        <group position={[0, 0.95, -0.15]} rotation={[-Math.PI / 18, 0, 0]}>
-          {/* Spotlight volumetric cone */}
-          <mesh position={[0, 0.6, 0.2]} rotation={[Math.PI / 18, 0, 0]}>
-            <cylinderGeometry args={[0.08, 0.7, 1.3, 16, 1, true]} />
-            <meshBasicMaterial color="#fef08a" transparent opacity={isActive ? 0.08 : 0.01} side={THREE.DoubleSide} />
-          </mesh>
-
-          {/* Wooden Frame */}
-          <mesh castShadow>
-            <boxGeometry args={[1.05, 0.75, 0.04]} />
-            <meshStandardMaterial color="#3c220f" roughness={0.6} metalness={0.1} />
-          </mesh>
-          {/* Inner Golden border */}
-          <mesh position={[0, 0, 0.015]}>
-            <boxGeometry args={[0.97, 0.67, 0.02]} />
-            <meshStandardMaterial color="#d4af37" metalness={0.9} roughness={0.2} />
-          </mesh>
-          {/* Glass Face */}
-          <mesh position={[0, 0, 0.022]}>
-            <boxGeometry args={[0.93, 0.63, 0.01]} />
-            <meshStandardMaterial color="#fff" transparent opacity={0.3} roughness={0.05} />
-          </mesh>
-
-          {/* Transformed HTML Certificate */}
-          <Html
-            transform
-            position={[0, 0, 0.03]}
-            distanceFactor={2.15}
-            style={{ pointerEvents: "none" }}
-          >
-            <div
-              className="w-[190px] h-[120px] p-3 text-center flex flex-col justify-between select-none"
-              style={{
-                background: "#fcfaf2",
-                border: "4px double #d4af37",
-                color: "#1e293b",
-                opacity: isActive ? 1 : 0.35,
-              }}
-            >
-              <div className="border border-[#d4af37]/20 p-1.5 h-full flex flex-col justify-between">
-                <div>
-                  <span className="text-[6.5px] uppercase tracking-[0.25em] font-serif text-[#b45309] font-bold block">
-                    Diploma of Higher Education
-                  </span>
-                  <h4 className="text-[10px] font-serif font-bold text-slate-800 mt-1.5 leading-tight line-clamp-1">
-                    {primaryEd.degree || "Bachelor of Science"}
-                  </h4>
-                  <p className="text-[7.5px] font-serif text-slate-500 italic mt-0.5 line-clamp-1">
-                    awarded by {primaryEd.institute}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-end border-t border-[#d4af37]/20 pt-1.5 mt-1 font-serif text-[6.5px] text-slate-600">
-                  <span>Score: {primaryEd.score || "Passed"}</span>
-                  <span>{primaryEd.duration || "GRADUATE"}</span>
-                </div>
-              </div>
-            </div>
-          </Html>
+      {/* Framed diploma standing on the desk */}
+      {primary && (
+        <group position={[0, 1.7, 0.0]} rotation={[-Math.PI / 26, 0, 0]}>
+          <Model
+            src="/models/diploma-frame.glb"
+            fallback={
+              <DetailedDiplomaFrame
+                title={primary.degree}
+                institute={primary.institute}
+                duration={primary.duration}
+                score={primary.score}
+                width={1.05}
+                accent={accent}
+              />
+            }
+          />
         </group>
       )}
 
-      {/* 3. Stack of Leather-Bound Books */}
-      <group position={[-0.65, 0.42, 0.2]}>
-        {/* Book 1 (Bottom) - Blue */}
-        <mesh castShadow position={[0, 0.03, 0]} rotation={[0, 0.12, 0]}>
-          <boxGeometry args={[0.42, 0.06, 0.3]} />
-          <meshStandardMaterial color="#1e3a8a" roughness={0.7} />
-        </mesh>
-        <mesh position={[0.01, 0.03, 0]} rotation={[0, 0.12, 0]}>
-          <boxGeometry args={[0.4, 0.05, 0.28]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} />
-        </mesh>
-
-        {/* Book 2 (Middle) - Dark Red */}
-        <mesh castShadow position={[0.02, 0.085, 0.01]} rotation={[0, -0.06, 0]}>
-          <boxGeometry args={[0.38, 0.055, 0.28]} />
-          <meshStandardMaterial color="#7f1d1d" roughness={0.7} />
-        </mesh>
-        <mesh position={[0.03, 0.085, 0.01]} rotation={[0, -0.06, 0]}>
-          <boxGeometry args={[0.36, 0.045, 0.26]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} />
-        </mesh>
-
-        {/* Book 3 (Top) - Gold/Yellow cover with Graduation Cap on top */}
-        <mesh castShadow position={[0.01, 0.13, -0.01]} rotation={[0, 0.04, 0]}>
-          <boxGeometry args={[0.34, 0.045, 0.26]} />
-          <meshStandardMaterial color="#b45309" roughness={0.7} />
-        </mesh>
-        <mesh position={[0.02, 0.13, -0.01]} rotation={[0, 0.04, 0]}>
-          <boxGeometry args={[0.32, 0.035, 0.24]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} />
-        </mesh>
-
-        {/* 4. Graduation Cap resting on top book */}
-        <group position={[0.01, 0.15, -0.01]}>
-          {/* Cap Skull Base */}
-          <mesh castShadow position={[0, 0.03, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.06, 16]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.5} />
-          </mesh>
-          {/* Cap Square Board */}
-          <mesh castShadow position={[0, 0.065, 0]} rotation={[0, Math.PI / 4, 0]}>
-            <boxGeometry args={[0.26, 0.015, 0.26]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.5} />
-          </mesh>
-          {/* Cap Tassel Line */}
-          <mesh position={[0.08, 0.04, 0.08]} rotation={[0, 0, -Math.PI / 6]}>
-            <cylinderGeometry args={[0.005, 0.005, 0.08, 8]} />
-            <meshStandardMaterial color="#fbbf24" />
-          </mesh>
+      {/* Book stack with graduation cap on top, left of diploma */}
+      <group position={[-1.0, 0.89, 0.18]}>
+        <Model src="/models/books.glb" fallback={<DetailedBookStack />} />
+        <group position={[0.02, 0.18, 0]}>
+          <Model src="/models/graduation-cap.glb" fallback={<DetailedGraduationCap />} />
         </group>
       </group>
 
-      {/* 5. Brass Plaque (Secondary Education List) */}
-      {secondaryEd.length > 0 && (
-        <group position={[0.65, 0.42, 0.2]} rotation={[0, -Math.PI / 12, 0]}>
-          {/* Plaque backboard stand */}
-          <mesh castShadow position={[0, 0.08, 0]}>
-            <boxGeometry args={[0.5, 0.16, 0.22]} />
-            <meshStandardMaterial color="#1e293b" roughness={0.5} />
+      {/* Brass plaque with secondary education on the right */}
+      {secondary.length > 0 && (
+        <group position={[1.0, 0.89, 0.15]} rotation={[0, -Math.PI / 14, 0]}>
+          <mesh castShadow position={[0, 0.22, 0]}>
+            <boxGeometry args={[0.7, 0.44, 0.05]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.55} roughness={0.45} />
           </mesh>
-          {/* Golden Brass Plate */}
-          <mesh position={[0, 0.09, 0.11]} rotation={[-Math.PI / 6, 0, 0]}>
-            <boxGeometry args={[0.46, 0.14, 0.015]} />
-            <meshStandardMaterial color="#d4af37" metalness={0.95} roughness={0.1} />
+          <mesh position={[0, 0.22, 0.027]}>
+            <boxGeometry args={[0.62, 0.36, 0.005]} />
+            <meshStandardMaterial color="#d4af37" metalness={0.95} roughness={0.18} />
           </mesh>
-          {/* Plaque text */}
           <Html
             transform
-            position={[0, 0.15, 0.14]}
-            rotation={[-Math.PI / 6, 0, 0]}
-            distanceFactor={2.0}
+            position={[0, 0.22, 0.032]}
+            distanceFactor={1.55}
             style={{ pointerEvents: "none" }}
           >
-            <div className="w-[86px] text-left font-serif text-[5.5px] text-[#451a03] font-bold select-none leading-normal">
-              {secondaryEd.map((ed, idx) => (
-                <div key={idx} className="border-b border-[#451a03]/20 pb-1 mb-1 last:border-b-0 last:mb-0 last:pb-0">
-                  <p className="truncate font-black">{ed.degree || "Education"}</p>
-                  <p className="truncate font-medium italic">{ed.institute}</p>
+            <div
+              className="font-serif text-[6.5px] text-amber-900 select-none px-2 py-1.5"
+              style={{ width: "120px", height: "70px" }}
+            >
+              <div className="text-center text-[6px] uppercase tracking-[0.3em] font-bold border-b border-amber-900/30 pb-1 mb-1.5">
+                Additional Studies
+              </div>
+              {secondary.slice(0, 3).map((ed, idx) => (
+                <div
+                  key={idx}
+                  className="leading-snug border-b border-amber-900/10 pb-0.5 mb-0.5 last:border-0 last:mb-0"
+                >
+                  <div className="font-black truncate">{ed.degree || "Education"}</div>
+                  <div className="italic opacity-80 truncate">{ed.institute}</div>
                 </div>
               ))}
             </div>
@@ -183,7 +95,7 @@ export default function EducationWall({ position, education, accent }: Props) {
         </group>
       )}
 
-      <SectionLabel title="ACADEMIC STUDY" accent={accent} position={[0, 2.4, 0]} />
+      <SectionLabel title="ACADEMIC STUDY" accent={accent} position={[0, 3.2, 0]} />
     </InteractiveGroup>
   );
 }

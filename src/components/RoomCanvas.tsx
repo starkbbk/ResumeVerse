@@ -4,6 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import {
   AdaptiveDpr,
   AdaptiveEvents,
+  ContactShadows,
   Environment,
   OrbitControls,
   PerspectiveCamera,
@@ -14,6 +15,7 @@ import { Suspense } from "react";
 import * as THREE from "three";
 import RoomScene from "./RoomScene";
 import ScrollTimeline from "./three/ScrollTimeline";
+import CameraDebugHUD from "./three/CameraDebugHUD";
 import { useAppStore } from "@/lib/store";
 import { ScrollControls } from "@react-three/drei";
 
@@ -22,13 +24,12 @@ export default function RoomCanvas() {
   const mode = useAppStore((s) => s.mode);
   const room = useAppStore((s) => s.room);
 
-  // pages = sections + 1 (intro)
   const pages = room ? room.sections.length + 1 : 1;
 
   return (
     <Canvas
       shadows={!performanceMode}
-      dpr={performanceMode ? [1, 1.25] : [1, 1.75]}
+      dpr={performanceMode ? [1, 1.25] : [1, 1.85]}
       gl={{
         antialias: !performanceMode,
         alpha: false,
@@ -36,29 +37,45 @@ export default function RoomCanvas() {
       }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.05;
-        gl.setClearColor(new THREE.Color("#06070d"));
+        gl.toneMappingExposure = 1.32;
+        gl.setClearColor(new THREE.Color("#08091a"));
       }}
     >
       <Suspense fallback={null}>
-        <PerspectiveCamera makeDefault position={[0, 1.7, 7]} fov={55} />
-        <fog attach="fog" args={["#06070d", 14, 30]} />
-        <ambientLight intensity={0.35} />
-        <hemisphereLight args={["#a78bfa", "#0b0d18", 0.45]} />
+        <PerspectiveCamera
+          makeDefault
+          position={[0, 3.2, 12]}
+          fov={45}
+          near={0.5}
+          far={120}
+        />
+        <fog attach="fog" args={["#08091a", 18, 42]} />
 
         {!performanceMode && (
           <Stars
-            radius={70}
-            depth={40}
-            count={1500}
-            factor={3}
+            radius={75}
+            depth={45}
+            count={1800}
+            factor={3.2}
             saturation={0.4}
             fade
             speed={0.6}
           />
         )}
 
-        <Environment preset="night" />
+        <Environment preset="warehouse" />
+
+        {/* Soft contact shadow under the central emblem area */}
+        {!performanceMode && (
+          <ContactShadows
+            position={[0, 0.01, 0]}
+            opacity={0.45}
+            scale={20}
+            blur={2.5}
+            far={4}
+            color="#000000"
+          />
+        )}
 
         {mode === "scroll" ? (
           <ScrollControls pages={pages} damping={0.2} infinite={false}>
@@ -73,12 +90,12 @@ export default function RoomCanvas() {
               enableZoom
               enableDamping
               dampingFactor={0.08}
-              minDistance={3}
-              maxDistance={16}
-              minPolarAngle={Math.PI / 6}
-              maxPolarAngle={Math.PI / 2.05}
+              minDistance={4}
+              maxDistance={18}
+              minPolarAngle={Math.PI / 5}
+              maxPolarAngle={Math.PI / 2.2}
               enabled={mode === "explore"}
-              target={[0, 1.4, 0]}
+              target={[0, 1.8, 0]}
             />
           </>
         )}
@@ -86,6 +103,7 @@ export default function RoomCanvas() {
         <Preload all />
         <AdaptiveDpr pixelated />
         <AdaptiveEvents />
+        <CameraDebugHUD />
       </Suspense>
     </Canvas>
   );
